@@ -3,35 +3,25 @@ import cors from "cors";
 import axios from "axios";
 
 const app = express();
+// Render ke liye PORT hamesha process.env.PORT hona chahiye
 const PORT = process.env.PORT || 3000;
 
-// ✅ CORS Configuration
-app.use(cors({
-  origin: "*", 
-  methods: ["POST", "GET"],
-  allowedHeaders: ["Content-Type"]
-}));
-
+app.use(cors({ origin: "*" }));
 app.use(express.json());
 
 app.post("/check-inventory", async (req, res) => {
-  console.log("➡ Incoming request for SKU:", req.body.rtiSKU);
-
   const { rtiSKU, rtiVendor, rtiVariant } = req.body;
 
-  if (!rtiSKU) {
-    return res.status(400).json({ error: "SKU missing" });
-  }
+  if (!rtiSKU) return res.status(400).json({ error: "SKU missing" });
 
-  // Use AbortController to handle timeouts cleanly
+  // 1. Timeout ko badha kar 60 seconds karein (Render free tier slow ho sakta hai)
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 40000); // 40 second limit
+  const timeoutId = setTimeout(() => controller.abort(), 60000); 
 
   try {
     const response = await axios({
       method: "post",
       url: "https://smpapi.sewingmachinesplus.com/shopsite_api.asp",
-      // Use URLSearchParams for application/x-www-form-urlencoded
       data: new URLSearchParams({
         inv_status: "available",
         locale: "en-US",
@@ -49,44 +39,35 @@ app.post("/check-inventory", async (req, res) => {
       }),
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
-        // Using a real browser User-Agent can prevent timeouts caused by bot-blocking
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        // Browser jaisa User-Agent taaki block na ho
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
         "Accept": "*/*"
       },
-      signal: controller.signal
+      signal: controller.signal,
+      timeout: 60000 // Axios level timeout
     });
 
     clearTimeout(timeoutId);
-    console.log("✅ API Success:", response.status);
-    
-    // Return the response from the SMP API
     res.status(response.status).send(response.data);
 
   } catch (err) {
     clearTimeout(timeoutId);
-
-    if (err.name === 'AbortError' || err.code === "ECONNABORTED") {
-      console.error("❌ Request Timed Out after 40s");
+    
+    // Agar request cancel hui hai (Timeout ki wajah se)
+    if (axios.isCancel(err) || err.code === "ECONNABORTED" || err.message === "canceled") {
+      console.error("❌ API Timeout on Render");
       return res.status(504).json({ 
         error: "Timeout", 
-        message: "The external inventory server is taking too long to respond." 
+        message: "SMP API is responding too slowly for Render." 
       });
     }
 
-    if (err.response) {
-      // The server responded with a status code outside the 2xx range
-      console.error("❌ SMP API Error:", err.response.status);
-      return res.status(err.response.status).send(err.response.data);
-    } 
-
-    console.error("❌ Connection Error:", err.message);
-    res.status(500).json({
-      error: "Fetch failed",
-      message: err.message
-    });
+    console.error("❌ Error Detail:", err.message);
+    res.status(500).json({ error: "Fetch failed", message: err.message });
   }
 });
 
+// Render ke liye 0.0.0.0 bind karna zaroori hai
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
