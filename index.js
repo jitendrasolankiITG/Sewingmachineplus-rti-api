@@ -43,11 +43,12 @@ app.post("/check-inventory", async (req, res) => {
         variant: rtiVariant || ""
       }).toString(), // Convert to URL-encoded string
       {
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          "User-Agent": "NodeJS" // Some servers require User-Agent
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": "NodeJS",
+        "Accept": "*/*"
         },
-        timeout: 20000 // 15 seconds
+        timeout: 30000 // 15 seconds
       }
     );
 
