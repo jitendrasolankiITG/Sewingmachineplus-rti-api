@@ -28,6 +28,7 @@ app.post("/check-inventory", async (req, res) => {
             "https://smpapi.sewingmachinesplus.com/shopsite_api.asp",
             {
                 method: "POST",
+                timeout: "15000",
                 headers: {
                     "Content-Type": "application/x-www-form-urlencoded"
                 },
