@@ -5,29 +5,34 @@ import axios from "axios";
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-/* ✅ CORS – MUST be before routes */
+// ✅ CORS Configuration
 app.use(cors({
-  origin: "*",           // Allow all domains
-  methods: ["POST"],
+  origin: "*", 
+  methods: ["POST", "GET"],
   allowedHeaders: ["Content-Type"]
 }));
 
 app.use(express.json());
 
 app.post("/check-inventory", async (req, res) => {
-  console.log("➡ Incoming body:", req.body);
+  console.log("➡ Incoming request for SKU:", req.body.rtiSKU);
 
   const { rtiSKU, rtiVendor, rtiVariant } = req.body;
-console.log(rtiSKU);
+
   if (!rtiSKU) {
     return res.status(400).json({ error: "SKU missing" });
   }
 
+  // Use AbortController to handle timeouts cleanly
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 40000); // 40 second limit
+
   try {
-    // Make POST request to SMP API using axios
-    const response = await axios.post(
-      "https://smpapi.sewingmachinesplus.com/shopsite_api.asp",
-      new URLSearchParams({
+    const response = await axios({
+      method: "post",
+      url: "https://smpapi.sewingmachinesplus.com/shopsite_api.asp",
+      // Use URLSearchParams for application/x-www-form-urlencoded
+      data: new URLSearchParams({
         inv_status: "available",
         locale: "en-US",
         storeid: "sewmachshop",
@@ -41,34 +46,44 @@ console.log(rtiSKU);
         p1type: "T",
         vendor: rtiVendor || "",
         variant: rtiVariant || ""
-      }).toString(), // Convert to URL-encoded string
-      {
+      }),
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
-        "User-Agent": "NodeJS",
+        // Using a real browser User-Agent can prevent timeouts caused by bot-blocking
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Accept": "*/*"
-        },
-        timeout: 30000 // 15 seconds
-      }
-    );
-console.log(response.data);
-    // Send SMP API response directly
+      },
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+    console.log("✅ API Success:", response.status);
+    
+    // Return the response from the SMP API
     res.status(response.status).send(response.data);
 
   } catch (err) {
-    console.error("❌ API Request Failed:", err.message);
+    clearTimeout(timeoutId);
 
-    // Axios error handling
-    if (err.response) {
-      // SMP API responded with error status
-      res.status(err.response.status).send(err.response.data);
-    } else if (err.code === "ECONNABORTED") {
-      // Timeout error
-      res.status(504).json({ error: "Timeout", message: "Request took too long" });
-    } else {
-      // Network or other errors
-      res.status(500).json({ error: "Fetch failed", message: err.message });
+    if (err.name === 'AbortError' || err.code === "ECONNABORTED") {
+      console.error("❌ Request Timed Out after 40s");
+      return res.status(504).json({ 
+        error: "Timeout", 
+        message: "The external inventory server is taking too long to respond." 
+      });
     }
+
+    if (err.response) {
+      // The server responded with a status code outside the 2xx range
+      console.error("❌ SMP API Error:", err.response.status);
+      return res.status(err.response.status).send(err.response.data);
+    } 
+
+    console.error("❌ Connection Error:", err.message);
+    res.status(500).json({ 
+      error: "Fetch failed", 
+      message: err.message 
+    });
   }
 });
 
