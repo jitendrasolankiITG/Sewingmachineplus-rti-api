@@ -47,7 +47,7 @@ app.post("/check-inventory", async (req, res) => {
           "Content-Type": "application/x-www-form-urlencoded",
           "User-Agent": "NodeJS" // Some servers require User-Agent
         },
-        timeout: 15000 // 15 seconds
+        timeout: 20000 // 15 seconds
       }
     );
 
