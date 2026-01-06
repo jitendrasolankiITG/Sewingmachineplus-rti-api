@@ -80,13 +80,13 @@ app.post("/check-inventory", async (req, res) => {
     } 
 
     console.error("❌ Connection Error:", err.message);
-    res.status(500).json({ 
-      error: "Fetch failed", 
-      message: err.message 
+    res.status(500).json({
+      error: "Fetch failed",
+      message: err.message
     });
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running on port ${PORT}`);
 });
