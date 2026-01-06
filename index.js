@@ -18,7 +18,7 @@ app.post("/check-inventory", async (req, res) => {
   console.log("➡ Incoming body:", req.body);
 
   const { rtiSKU, rtiVendor, rtiVariant } = req.body;
-
+console.log(rtiSKU);
   if (!rtiSKU) {
     return res.status(400).json({ error: "SKU missing" });
   }
@@ -51,7 +51,7 @@ app.post("/check-inventory", async (req, res) => {
         timeout: 30000 // 15 seconds
       }
     );
-
+console.log(response.data);
     // Send SMP API response directly
     res.status(response.status).send(response.data);
 
